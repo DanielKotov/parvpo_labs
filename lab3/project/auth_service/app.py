@@ -1,6 +1,4 @@
-from flask import Flask, request, jsonify
-import jwt
-import datetime
+from flask import Flask, request, jsonify, render_template, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -28,21 +26,19 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    if request.method == "POST":
+        username = request.form['username']
+        password = request.form['password']
 
-    if not username or not password:
-        return jsonify({'message': 'Missing username or password'}), 400
+        if not username or not password:
+            return jsonify({'message': 'Missing username or password'}), 400
 
-    user = users.get(username)
-
-    if not user or not check_password_hash(user, password):
-        return jsonify({'message': 'Invalid credentials'}), 401
-
-    token = jwt.encode({'username': username, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
-    return jsonify({'token': token}), 200
+        if users.get(username) == password:
+            return redirect(url_for("welcome"))
+        else:
+            return jsonify({'message': 'Invalid credentials'}), 401
+    return render_template('login.html')
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
