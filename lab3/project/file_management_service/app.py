@@ -4,7 +4,7 @@ import psycopg2
 app = Flask(__name__)
 
 # Connect to PostgreSQL
-conn = psycopg2.connect("dbname=files_db user=postgres password=your_password host=db")
+conn = psycopg2.connect("dbname=files_db user=postgres password=postgres host=db")
 cursor = conn.cursor()
 
 @app.route('/files', methods=['POST'])

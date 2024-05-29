@@ -1,10 +1,24 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for
-from werkzeug.security import generate_password_hash, check_password_hash
-
+from os import urandom
+from hashlib import sha256
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
 
 users = {}
+HASH_SALT = 1
+HASH = 2
+
+
+def hashing(password, mode, salt=None):
+    h = sha256()
+    if salt is None:
+        salt = urandom(16)
+    h.update(salt + password)
+    if mode == HASH_SALT:
+        return h.hexdigest(), salt
+    if mode == HASH:
+        return h.hexdigest()
+
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -18,9 +32,7 @@ def register():
     if username in users:
         return jsonify({'message': 'User already exists'}), 400
 
-    hashed_password = generate_password_hash(password, method='sha256', salt_length=16)
-    users[username] = hashed_password
-
+    users[username] = hashing(password, 1)
     return jsonify({'message': 'User registered successfully'}), 201
 
 
@@ -32,8 +44,8 @@ def login():
 
         if not username or not password:
             return jsonify({'message': 'Missing username or password'}), 400
-
-        if users.get(username) == password:
+        hsh, salt = users.get(username)
+        if hashing(password, 2, salt) == hsh:
             return redirect(url_for("welcome"))
         else:
             return jsonify({'message': 'Invalid credentials'}), 401
