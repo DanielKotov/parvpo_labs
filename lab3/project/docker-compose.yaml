@@ -6,7 +6,6 @@ services:
     ports:
       - "15672:15672"
       - "5672:5672"
-
   postgres:
     build: postgres
     restart: always
@@ -24,20 +23,17 @@ services:
       - "5000:5000"
     depends_on:
       - postgres
-
-  upload_service:
-    build: ./upload_service
-    ports:
-      - "5001:5001"
-    depends_on:
       - rabbitmq
 
   file_management_service:
     build: ./file_management_service
     ports:
       - "5002:5002"
+    environment:
+      - ENCRYPTION_KEY=WX78XrhcWEcPgqbZ7C/Aq7tokjleyQvc5LBx7luBn3A=
     depends_on:
       - postgres
+      - rabbitmq
 
 volumes:
   postgres-data:

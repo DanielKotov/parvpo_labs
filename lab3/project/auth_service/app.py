@@ -60,10 +60,17 @@ def upload():
 
         if user_file and allowed_file(user_file.filename):
             # Читаем файл и отправляем его в очередь RabbitMQ
+            file_content = user_file.read()
             connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
             channel = connection.channel()
             channel.queue_declare(queue='file_queue')
-            message = json.dumps({'username': session['username'], 'filename': user_file.filename, 'content': file_content.decode('latin1')})
+
+            message = json.dumps({
+                'username': session['username'],
+                'filename': user_file.filename,
+                'content': file_content.hex()
+            })
+
             channel.basic_publish(exchange='', routing_key='file_queue', body=message)
             connection.close()
             return render_template('upload.html', message='File uploaded successfully')

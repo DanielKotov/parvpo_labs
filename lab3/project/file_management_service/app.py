@@ -1,26 +1,18 @@
-from flask import Flask, request, jsonify
-import psycopg2
+import pika
+import json
+from utils import *
 
-app = Flask(__name__)
+def callback(ch, method, properties, body):
+    data = json.loads(body)
+    username = data['username']
+    filename = data['filename']
+    file_content = data['content']
+    enc_content, iv = encrypt_file(file_content)
+    save_to_db(username, filename, enc_content, iv)
 
-# Connect to PostgreSQL
-conn = psycopg2.connect("dbname=files_db user=postgres password=postgres host=db")
-cursor = conn.cursor()
 
-@app.route('/files', methods=['POST'])
-def add_file():
-    data = request.get_json()
-    filename = data.get('filename')
-    size = data.get('size')
-    file_type = data.get('file_type')
-
-    if not filename or not size or not file_type:
-        return jsonify({'message': 'Missing file information'}), 400
-
-    cursor.execute("INSERT INTO files (filename, size, file_type) VALUES (%s, %s, %s)", (filename, size, file_type))
-    conn.commit()
-
-    return jsonify({'message': 'File metadata saved'}), 201
-
-if __name__ == '__main__':
-    app.run(debug=True)
+connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+channel = connection.channel()
+channel.queue_declare(queue='file_queue')
+channel.basic_consume(queue='file_queue', on_message_callback=callback, auto_ack=True)
+channel.start_consuming()
