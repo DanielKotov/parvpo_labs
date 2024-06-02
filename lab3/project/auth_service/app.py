@@ -1,5 +1,6 @@
-from flask import Flask, request, render_template, redirect, url_for, session
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify
 from utils import *
+import pika
 import json
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
@@ -8,40 +9,45 @@ app.config['SECRET_KEY'] = 'your_secret_key'
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == "POST":
-        data = request.form
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
         username = data.get('username')
         password = data.get('password')
-
         if not username or not password:
-            error = "Missing username or password"
-            return render_template('register.html', error=error)
-        if username in users.keys():
-            error = "User already exists"
-            return render_template('register.html', error=error)
-
+            return jsonify({"error": "Missing username or password"}), 400
+        if get_user_from_db(username):
+            return jsonify({"error": "User already exists"}), 400
         hash_passwd, salt = hashing(password, HASH_SALT)
-        save_user_to_db(username, password, salt)
-        message = "User registered successfully"
-        return render_template('register.html', message=message)
+        save_user_to_db(username, hash_passwd, salt)
+        return jsonify({"message": "User registered successfully"}), 201
     return render_template('register.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == "POST":
-        username = request.form['username']
-        password = request.form['password']
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+
+        username = data.get('username')
+        password = data.get('password')
         if not username or not password:
-            return render_template('login.html', error='Missing username of password')
+            return jsonify({"error": 'Missing username of password'}), 400
+
         user = get_user_from_db(username)
         if user:
             db_username, db_password_hash, db_salt = user
             if hashing(password, HASH, db_salt) == db_password_hash:
-                return redirect(url_for("welcome"))
+                session['username'] = username
+                return redirect(url_for("upload"))
             else:
-                return render_template('login.html', error='Ivalid credentials')
+                return jsonify({"error" : 'Ivalid credentials'}), 401
         else:
-            return render_template('login.html', error='User does not exist')
+            return jsonify({'error': 'User does not exist'}), 404
     return render_template('login.html')
 
 
@@ -52,18 +58,18 @@ def upload():
 
     if request.method == 'POST':
         if 'file' not in request.files:
-            return redirect('No file part')
+            return jsonify({"error": 'No file part'}), 400
         user_file = request.files['file']
 
         if user_file.filename == '':
-            return redirect('No selected file')
+            return jsonify({"error": 'No selected file'}), 400
 
         if user_file and allowed_file(user_file.filename):
             # Читаем файл и отправляем его в очередь RabbitMQ
             file_content = user_file.read()
             connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
             channel = connection.channel()
-            channel.queue_declare(queue='file_queue')
+            channel.queue_declare(queue='file_queue', durable=True)
 
             message = json.dumps({
                 'username': session['username'],
@@ -73,9 +79,9 @@ def upload():
 
             channel.basic_publish(exchange='', routing_key='file_queue', body=message)
             connection.close()
-            return render_template('upload.html', message='File uploaded successfully')
+            return jsonify({'message': 'File uploaded successfully'}), 200
         else:
-            return render_template('upload.html', error='No file selected')
+            return jsonify({'error': 'No file selected'}), 400
     return render_template('upload.html')
 
 

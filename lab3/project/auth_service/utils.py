@@ -28,35 +28,37 @@ def hashing(password, mode, salt=None):
 
 
 def save_user_to_db(username, password_hash, salt):
-    connection = psycopg2.connect(
-            dbname='users',
+    con = psycopg2.connect(
+            dbname='postgres',
             user='postgres',
             password='postgres',
-            host='postgres'
+            host='postgres',
+            port="5432"
     )
-    cursor = connection.cursor()
-	cursor.execute(
-			"INSERT INTO users (username, password_hash, salt) VALUES (%s, %s, %s)",
-			(username, password_hash, salt)
-			)
-	connection.commit()
-	cursor.close()
-	connection.close()
+    cur = con.cursor()
+    cur.execute(
+            "INSERT INTO users (username, password_hash, salt) VALUES (%s, %s, %s)",
+            (username, password_hash, salt)
+            )
+    con.commit()
+    cur.close()
+    con.close()
 
 
 def get_user_from_db(username):
-	connection = psycopg2.connect(
-			dbname='users',
-			user='postgres',
-			password='postgres',
-			host='postgres'
-			)
-	cursor = connection.cursor()
-	cursor.execute(
-			"SELECT username, password_hash, salt FROM users WHERE username = %s",
-			(username,)
-			)
-	user = cursor.fetchone()
-	cursor.close()
-	connection.close()
-	return user
+    con = psycopg2.connect(
+            dbname='postgres',
+            user='postgres',
+            password='postgres',
+            host='postgres',
+            port="5432"
+            )
+    cur = con.cursor()
+    cur.execute(
+            "SELECT username, password_hash, salt FROM users WHERE username = %s",
+            (username,)
+            )
+    user = cur.fetchone()
+    cur.close()
+    con.close()
+    return user

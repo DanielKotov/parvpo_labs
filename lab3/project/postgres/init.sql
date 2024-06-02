@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS files (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    filename VARCHAR(255) NOT NULL,
+    username TEXT NOT NULL,
+    filename TEXT NOT NULL,
     content TEXT NOT NULL,
     iv TEXT UNIQUE NOT NULL
 );
