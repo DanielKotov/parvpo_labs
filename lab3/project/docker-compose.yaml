@@ -29,10 +29,9 @@ services:
           editable: false
         EOF
         /run.sh
-        #environment:
-        #- GF_SECURITY_ADMIN_PASSWORD=admin
-        #volumes:
-        #- grafana-storage:/var/lib/grafana
+    volumes:
+      - $PWD/grafana_data:/var/lib/grafana
+
 
   promtail:
     image: grafana/promtail:2.3.0
@@ -51,7 +50,7 @@ services:
 
   loki:
     image: grafana/loki:2.3.0
-    container_name: loki123
+    container_name: loki
     ports:
       - "3100:3100"
     volumes:
@@ -93,3 +92,4 @@ services:
 
 volumes:
   app-volume:
+  grafana-storage: {}

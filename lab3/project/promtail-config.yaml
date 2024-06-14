@@ -19,6 +19,20 @@ scrape_configs:
     pipeline_stages:
       - json:
           expressions:
+            levelname: levelname
+            message: message
+            asctime: asctime
+            name: name
+            headers: headers
+            body: body
+            status: status
+      - labels:
             level: levelname
-            msg: message
             time: asctime
+            name: name
+            body: body
+            headers: headers
+            status: status
+      - output:
+            source: message
+
