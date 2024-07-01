@@ -1,39 +1,57 @@
-from flask import Flask, request
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad
-import psycopg2
-from os import urandom, getenv
-import base64
+import pika
+import json
+from utils import encrypt_file, saves_to_db
+import logging
+from logging.handlers import RotatingFileHandler
+from pythonjsonlogger import jsonlogger
+from os import urandom
+from flask import Flask
 
-BLOCK_SIZE = 16
-ENCRYPTION_KEY = base64.b64decode(getenv('ENCRYPTION_KEY'))
 
-app = Flask(__name__)
+file_management = Flask(__name__)
+file_management.config["SECRET_KEY"] = urandom(24)
 
-@app.route('/')
+handler = RotatingFileHandler("/dummy/file_management.log", maxBytes=2000, backupCount=10)
+handler.setLevel(logging.DEBUG)
+
+formatter = jsonlogger.JsonFormatter('%(asctime)s %(levelname)s %(name)s %(message)s')
+handler.setFormatter(formatter)
+
+logger = logging.getLogger('werkzeug')
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+
+
+@file_management.route('/')
 def index():
+    file_management.logger.info('file management service is running')
     return 'File management service is running'
 
 
-def encrypt_file(file_content):
-    iv = urandom(BLOCK_SIZE)
-    cipher = AES.new(ENCRYPTION_KEY, AES.MODE_CFB, iv)
-    enc_content = cipher.encrypt(pad(file_content, BLOCK_SIZE))
-    return enc_content.hex(), iv.hex()
+def callback(ch, method, properties, body):
+    data = json.loads(body)
+    username = data['username']
+    filename = data['filename']
+    file_content = bytes.fromhex(data['content'])
+    enc_content, iv = encrypt_file(file_content)
+    try:
+        saves_to_db(username, filename, enc_content, iv)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as e:
+        file_management.logger.error("Failed to save files in the database:  %s", e)
 
 
-def saves_to_db(username, filename, enc_content, iv):
-    con = psycopg2.connect(
-            user='postgres',
-            password='postgres',
-            host='postgres',
-            port="5432"
-    )
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO files (username, filename, content, iv) VALUES (%s, %s, %s, %s)",
-        (username, filename, enc_content, iv)
-    )
-    con.commit()
-    cur.close()
-    con.close()
+def start_consumer():
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
+        channel = connection.channel()
+        channel.queue_declare(queue='file_queue', durable=True)
+        channel.basic_consume(queue='file_queue', on_message_callback=callback)
+        file_management.logger.info("Consumer started and waiting for messages")
+        channel.start_consuming()
+    except Exception as e:
+        file_management.logger.error(f"Failed to start consuming or connect to RabbitMQ: %s", e)
+
+
+if __name__ == "__main__":
+    file_management.run(debug=True, port=5002)

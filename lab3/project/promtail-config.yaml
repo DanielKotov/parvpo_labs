@@ -36,3 +36,23 @@ scrape_configs:
       - output:
             source: message
 
+  - job_name: file_management_service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: file_management_service
+          __path__: /dummy/file_management.log
+    pipeline_stages:
+      - json:
+          expressions:
+            levelname: levelname
+            message: message
+            asctime: asctime
+            name: name
+      - labels:
+            level: levelname
+            time: asctime
+            name: name
+      - output:
+            source: message

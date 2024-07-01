@@ -1,4 +1,6 @@
 # postgres/Dockerfile
-FROM postgres:13.4-alpine
+FROM postgres:latest
+
 
 COPY init.sql /docker-entrypoint-initdb.d/
+
